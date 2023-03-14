@@ -8,8 +8,9 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 model_type = "MiDaS_small"
+# model_type = "DPT_LeViT_224"
 
-# Download the MiDaS
+# Import MiDaS
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
 if torch.cuda.is_available():
     device = torch.device("cuda")
@@ -22,7 +23,7 @@ midas.eval()
 # Input transformation pipeline
 midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
 
-if model_type == "DPT_Large" or model_type == "DPT_Hybrid":
+if "DPT" in model_type:
     transform = midas_transforms.dpt_transform
 else:
     transform = midas_transforms.small_transform
@@ -35,6 +36,7 @@ while cap.isOpened():
 
     # Transform input for midas
     img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    # img = cv2.rotate(img, cv2.ROTATE_90_COUNTERCLOCKWISE)
     imgbatch = transform(img).to(device)
 
     # Make a prediction

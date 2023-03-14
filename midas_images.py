@@ -2,13 +2,12 @@
 import cv2
 import torch
 import matplotlib.pyplot as plt
-import plotly.express as px
 import numpy as np
 import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-model_type = "DPT_Large"
+model_type = "DPT_BEiT_L_512"
 
 # Download the MiDaS
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
@@ -26,32 +25,55 @@ def get_depth_estimate(filename, model_type):
     # Input transformation pipeline
     midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
 
-    if model_type == "DPT_Large" or model_type == "DPT_Hybrid":
-        transform = midas_transforms.dpt_transform
-    else:
-        transform = midas_transforms.small_transform
+    # DPT Transform appears better
+    transform = midas_transforms.dpt_transform
+
+    # if model_type == "MiDaS_small":
+    #     transform = midas_transforms.small_transform
+    # elif model_type == "DPT_Large" or model_type == "DPT_Hybrid":
+    #     transform = midas_transforms.dpt_transform
+    # elif model_type == "DPT_BEiT_L_512":
+    #     transform = midas_transforms.beit512_transform
+    # elif (
+    #     model_type == "DPT_SwinV2_L_384"
+    #     or model_type == "DPT_SwinV2_B_384"
+    #     or model_type == "DPT_Swin_L_384"
+    # ):
+    #     transform = midas_transforms.swin384_transform
+    # elif model_type == "DPT_SwinV2_T_256":
+    #     transform = midas_transforms.swin256_transform
+    # elif model_type == "DPT_LeViT_224":
+    #     transform = midas_transforms.levit_transform
+    # else:
+    # transform = midas_transforms.default_transform
 
     # Transform input for midas
     img = cv2.imread("./data/" + image)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    # Convert the image to grayscale (less good somehow)
+    # img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+
     input_batch1 = transform(img).to(device)
 
-    # Make a prediction 1
+    # Make a prediction
     with torch.no_grad():
-        prediction1 = midas(input_batch1)
-        prediction1 = torch.nn.functional.interpolate(
-            prediction1.unsqueeze(1),
+        prediction = midas(input_batch1)
+        prediction = torch.nn.functional.interpolate(
+            prediction.unsqueeze(1),
             size=img.shape[:2],
             mode="bicubic",
             align_corners=False,
         ).squeeze()
 
-        output = prediction1.cpu().numpy()
+        output = prediction.cpu().numpy()
 
     return output
 
 
 for image in os.listdir("./data/"):
     output = get_depth_estimate(image, model_type)
+    directory = "./output/" + image.split(".")[0] + "_" + model_type + ".png"
+    plt.axis("off")
     plt.imshow(output, cmap="plasma")
-    plt.savefig("./output/" + image.split(".")[0] + ".png")
+    plt.savefig(directory, dpi=600, transparent=True, bbox_inches="tight", pad_inches=0)
