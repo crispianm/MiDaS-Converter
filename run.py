@@ -4,6 +4,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import sys
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -19,24 +20,24 @@ else:
 midas.to(device)
 midas.eval()
 
+# Input transformation pipeline
+midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
 
-def get_depth_estimate(filename, model_type):
+# DPT Transform appears better
+transform = midas_transforms.dpt_transform
 
-    # Input transformation pipeline
-    midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
 
-    # DPT Transform appears better
-    transform = midas_transforms.dpt_transform
+def get_depth_estimate(filepath, transform):
 
     # Transform input for midas
-    img = cv2.imread("./data/" + filename)
+    img = cv2.imread(filepath)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-    input_batch1 = transform(img).to(device)
+    input_batch = transform(img).to(device)
 
     # Make a prediction
     with torch.no_grad():
-        prediction = midas(input_batch1)
+        prediction = midas(input_batch)
         prediction = torch.nn.functional.interpolate(
             prediction.unsqueeze(1),
             size=img.shape[:2],
@@ -49,49 +50,36 @@ def get_depth_estimate(filename, model_type):
     return output
 
 
-def tree2list(directory: str) -> list:
-    import os
+def process_folder(input_folder_path, output_folder_path, transform):
+    if not os.path.exists(output_folder_path):
+        os.makedirs(output_folder_path)
+    for item in os.scandir(input_folder_path):
+        if item.is_file():
+            # Process file
+            input_file_path = item.path
+            output_file_path = os.path.join(
+                output_folder_path, os.path.splitext(item.name)[0] + "_depth.png"
+            )
+            if os.path.exists(output_file_path):
+                print(f"{output_file_path} already exists, skipping.")
+            else:
+                depth_estimate = get_depth_estimate(input_file_path, transform)
+                print(f"Saving image {output_file_path}.")
+                plt.imsave(output_file_path, depth_estimate, cmap="plasma")
+        elif item.is_dir():
+            # Recursively process subfolder
+            subfolder_output_path = os.path.join(output_folder_path, item.name)
+            process_folder(item.path, subfolder_output_path, transform)
 
-    tree = []
-    for i in os.scandir(directory):
-        if i.is_dir():
-            tree.append(["Folder", i.name, i.path])
-            tree.extend(tree2list(i.path))
-        else:
-            tree.append(["File", i.name, i.path])
-    return tree
 
+# python run.py "D:/LLVIP/data" "D:/LLVIP/depth"
+# process_folder("./data", "./depth", transform)
 
-tree_list = tree2list("./data/")
-if not os.path.exists("./output/"):
-    os.makedirs("./output/")
-    print("Creating folder: ./output/")
-
-for tree in tree_list:
-    tree[2] = tree[2].split("/")
-    tree[2][1] = "output"
-
-    if tree[0] == "Folder":
-        if not os.path.exists("/".join(tree[2])):
-            os.makedirs("/".join(tree[2]))
-            print("Creating folder: ", "/".join(tree[2]))
-
-    elif tree[0] == "File":
-        output = get_depth_estimate(tree[2][-1], model_type)
-
-        tree[2][-1] = tree[2][-1].split(".")[0] + "_depth.png"
-
-        new_filepath = "/".join(tree[2])
-
-        plt.axis("off")
-        plt.imshow(output, cmap="plasma")
-        plt.savefig(
-            new_filepath, dpi=600, transparent=True, bbox_inches="tight", pad_inches=0
-        )
-
-# for image in os.listdir("./data/"):
-#     output = get_depth_estimate(image, model_type)
-#     new_directory = "./output/" + image.split(".")[0] + "_" + model_type + ".png"
-#     plt.axis("off")
-#     plt.imshow(output, cmap="plasma")
-#     plt.savefig(new_directory, dpi=600, transparent=True, bbox_inches="tight", pad_inches=0)
+if __name__ == "__main__":
+    # Check that the correct number of arguments have been provided
+    if len(sys.argv) != 3:
+        print(f"Usage: python {sys.argv[0]} input_folder output_folder")
+    else:
+        input_folder = sys.argv[1]
+        output_folder = sys.argv[2]
+        process_folder(input_folder, output_folder, transform)
