@@ -8,7 +8,7 @@ import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 model_type = "MiDaS_small"
-# model_type = "DPT_LeViT_224"
+model_type = "DPT_LeViT_224"
 
 # Import MiDaS
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
@@ -23,10 +23,24 @@ midas.eval()
 # Input transformation pipeline
 midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
 
-if "DPT" in model_type:
+if model_type == "MiDaS_small":
+        transform = midas_transforms.small_transform
+elif model_type == "DPT_Large" or model_type == "DPT_Hybrid":
     transform = midas_transforms.dpt_transform
+elif model_type == "DPT_BEiT_L_512":
+    transform = midas_transforms.beit512_transform
+elif (
+        model_type == "DPT_SwinV2_L_384"
+        or model_type == "DPT_SwinV2_B_384"
+        or model_type == "DPT_Swin_L_384"
+    ):
+    transform = midas_transforms.swin384_transform
+elif model_type == "DPT_SwinV2_T_256":
+    transform = midas_transforms.swin256_transform
+elif model_type == "DPT_LeViT_224":
+    transform = midas_transforms.levit_transform
 else:
-    transform = midas_transforms.small_transform
+    transform = midas_transforms.default_transform
 
 
 # Hook into OpenCV
