@@ -23,12 +23,12 @@ midas.eval()
 # Input transformation pipeline
 midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
 
-# DPT Transform appears better
-transform = midas_transforms.dpt_transform
+# BEiT Transform appears better, but you could use DPT instead
+# transform = midas_transforms.dpt_transform
+transform = midas_transforms.beit512_transform
 
 
 def get_depth_estimate(filepath, transform):
-
     # Transform input for midas
     img = cv2.imread(filepath)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -48,6 +48,17 @@ def get_depth_estimate(filepath, transform):
         output = prediction.cpu().numpy()
 
     return output
+
+
+# def split_video(video_filepath):
+#     vidcap = cv2.VideoCapture(video_filepath)
+#     count = 0
+#     success = True
+#     while success:
+#         success,image = vidcap.read()
+#         print('Read a new frame: ', success)
+#         cv2.imwrite("frame%d.jpg" % count, image)     # save frame as JPEG file
+#         count += 1
 
 
 def process_folder(input_folder_path, output_folder_path, transform):
@@ -72,9 +83,6 @@ def process_folder(input_folder_path, output_folder_path, transform):
             process_folder(item.path, subfolder_output_path, transform)
 
 
-# python run.py "D:/LLVIP/data" "D:/LLVIP/depth"
-# process_folder("./data", "./depth", transform)
-
 if __name__ == "__main__":
     # Check that the correct number of arguments have been provided
     if len(sys.argv) != 3:
@@ -83,3 +91,6 @@ if __name__ == "__main__":
         input_folder = sys.argv[1]
         output_folder = sys.argv[2]
         process_folder(input_folder, output_folder, transform)
+
+
+# python run.py "C:\\Users\\yournamehere\\Desktop\\files" "C:\\Users\\yournamehere\\Desktop\\data_out"
