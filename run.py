@@ -10,13 +10,13 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 model_type = "DPT_BEiT_L_512"
 
-# Download the MiDaS
-midas = torch.hub.load("intel-isl/MiDaS", model_type)
+# Download the MiDaS model
 if torch.cuda.is_available():
     device = torch.device("cuda")
 else:
     device = torch.device("cpu")
     print("No GPU found, using CPU instead")
+midas = torch.hub.load("intel-isl/MiDaS", model_type)
 midas.to(device)
 midas.eval()
 
@@ -93,4 +93,4 @@ if __name__ == "__main__":
         process_folder(input_folder, output_folder, transform)
 
 
-# python run.py "C:\\Users\\yournamehere\\Desktop\\files" "C:\\Users\\yournamehere\\Desktop\\data_out"
+# python run.py "./data" "./data_out"
