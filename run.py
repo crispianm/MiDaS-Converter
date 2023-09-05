@@ -8,27 +8,8 @@ import sys
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-model_type = "DPT_BEiT_L_512"
 
-# Download the MiDaS model
-if torch.cuda.is_available():
-    device = torch.device("cuda")
-else:
-    device = torch.device("cpu")
-    print("No GPU found, using CPU instead")
-midas = torch.hub.load("intel-isl/MiDaS", model_type)
-midas.to(device)
-midas.eval()
-
-# Input transformation pipeline
-midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
-
-# BEiT Transform appears better, but you could use DPT instead
-# transform = midas_transforms.dpt_transform
-transform = midas_transforms.beit512_transform
-
-
-def get_depth_estimate(filepath, transform):
+def get_depth_estimate(filepath, transform, midas, device, color=True):
     # Transform input for midas
     img = cv2.imread(filepath)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -61,7 +42,9 @@ def get_depth_estimate(filepath, transform):
 #         count += 1
 
 
-def process_folder(input_folder_path, output_folder_path, transform):
+def process_folder(
+    input_folder_path, output_folder_path, transform, midas, device, color=True
+):
     if not os.path.exists(output_folder_path):
         os.makedirs(output_folder_path)
     for item in os.scandir(input_folder_path):
@@ -74,23 +57,59 @@ def process_folder(input_folder_path, output_folder_path, transform):
             if os.path.exists(output_file_path):
                 print(f"{output_file_path} already exists, skipping.")
             else:
-                depth_estimate = get_depth_estimate(input_file_path, transform)
+                depth_estimate = get_depth_estimate(
+                    input_file_path, transform, midas, device, color=color
+                )
                 print(f"Saving image {output_file_path}.")
-                plt.imsave(output_file_path, depth_estimate, cmap="plasma")
+                if color == True:
+                    plt.imsave(output_file_path, depth_estimate, cmap="plasma")
+                else:
+                    plt.imsave(output_file_path, depth_estimate, cmap="binary")
         elif item.is_dir():
             # Recursively process subfolder
             subfolder_output_path = os.path.join(output_folder_path, item.name)
-            process_folder(item.path, subfolder_output_path, transform)
+            process_folder(
+                item.path, subfolder_output_path, transform, midas, device, color=color
+            )
 
 
 if __name__ == "__main__":
+    # todo: add command line arguments for model type and input/output folders
+
+    model_type = "DPT_BEiT_L_512"
+
+    # Download the MiDaS model
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("Using ", torch.cuda.get_device_name(0))
+    else:
+        device = torch.device("cpu")
+        print("No GPU found, using CPU instead")
+    midas = torch.hub.load("intel-isl/MiDaS", model_type)
+    midas.to(device)
+    midas.eval()
+
+    # Input transformation pipeline
+    midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
+
+    # BEiT Transform appears better, but you could use DPT instead
+    # transform = midas_transforms.dpt_transform
+    transform = midas_transforms.beit512_transform
+
+    # Set to False if you want grayscale output
+    color = True
+
     # Check that the correct number of arguments have been provided
     if len(sys.argv) != 3:
         print(f"Usage: python {sys.argv[0]} input_folder output_folder")
     else:
         input_folder = sys.argv[1]
         output_folder = sys.argv[2]
-        process_folder(input_folder, output_folder, transform)
+        process_folder(
+            input_folder, output_folder, transform, midas, device, color=color
+        )
 
 
 # python run.py "./data" "./data_out"
+"C:/Users/crisp/Desktop/layered-neural-atlases/data/puck"
+"C:/Users/crisp/Desktop/layered-neural-atlases/data/puck_depth"
