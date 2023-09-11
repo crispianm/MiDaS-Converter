@@ -4,12 +4,13 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import sys
+import argparse
+
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
-def get_depth_estimate(filepath, transform, midas, device, color=True):
+def get_depth_estimate(filepath, transform, midas, device, color):
     # Transform input for midas
     img = cv2.imread(filepath)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -43,7 +44,7 @@ def get_depth_estimate(filepath, transform, midas, device, color=True):
 
 
 def process_folder(
-    input_folder_path, output_folder_path, transform, midas, device, color=True
+    input_folder_path, output_folder_path, transform, midas, device, color
 ):
     if not os.path.exists(output_folder_path):
         os.makedirs(output_folder_path)
@@ -74,42 +75,65 @@ def process_folder(
 
 
 if __name__ == "__main__":
-    # todo: add command line arguments for model type and input/output folders
+    parser = argparse.ArgumentParser(
+        description="Apply MiDaS to a directory of images."
+    )
 
-    model_type = "DPT_BEiT_L_512"
+    parser.add_argument(
+        "-i",
+        "--input",
+        type=str,
+        required=True,
+        help="Path to folder containing images to apply MiDaS to. Ex: './data'",
+    )
 
-    # Download the MiDaS model
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        required=True,
+        help="Path to output files to. Ex: './data_out'",
+    )
+
+    parser.add_argument(
+        "-c",
+        "--color",
+        type=bool,
+        default=False,
+        choices=[True, False],
+        help="Whether to output color images. (Default: False)",
+    )
+
+    parser.add_argument(
+        "-d",
+        "--device",
+        type=str,
+        default="cuda",
+        choices=["cpu", "cuda"],
+        help="\nDevice to run the models. (Default: 'cuda')",
+    )
+
+    args = parser.parse_args()
+
+    # Check if GPU is available
     if torch.cuda.is_available():
         device = torch.device("cuda")
         print("Using ", torch.cuda.get_device_name(0))
     else:
         device = torch.device("cpu")
         print("No GPU found, using CPU instead")
+
+    # Download the MiDaS model
+    model_type = "DPT_BEiT_L_512"  # MiDaS v3.1 - Large     (highest accuracy, slowest inference speed)
     midas = torch.hub.load("intel-isl/MiDaS", model_type)
     midas.to(device)
     midas.eval()
 
-    # Input transformation pipeline
+    # Define transforms for model
     midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
-
-    # BEiT Transform appears better, but you could use DPT instead
+    transform = (
+        midas_transforms.beit512_transform
+    )  # BEiT Transform appears better for DPT_BEiT_L_512 model, but could use DPT instead
     # transform = midas_transforms.dpt_transform
-    transform = midas_transforms.beit512_transform
 
-    # Set to False if you want grayscale output
-    color = True
-
-    # Check that the correct number of arguments have been provided
-    if len(sys.argv) != 3:
-        print(f"Usage: python {sys.argv[0]} input_folder output_folder")
-    else:
-        input_folder = sys.argv[1]
-        output_folder = sys.argv[2]
-        process_folder(
-            input_folder, output_folder, transform, midas, device, color=color
-        )
-
-
-# python run.py "./data" "./data_out"
-"C:/Users/crisp/Desktop/layered-neural-atlases/data/puck"
-"C:/Users/crisp/Desktop/layered-neural-atlases/data/puck_depth"
+    process_folder(args.input, args.output, transform, midas, args.device, args.color)
