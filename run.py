@@ -6,9 +6,33 @@ import numpy as np
 import os
 import argparse
 
+from models.dpt_depth import DPTDepthModel
+
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
+def DPT_BEiT_L_512(pretrained=True, **kwargs):
+    """
+    MiDaS DPT_BEiT_L_512 model for monocular depth estimation
+    pretrained (bool): load pretrained weights into model
+    """
+
+    model = DPTDepthModel(
+            path=None,
+            backbone="beitl16_512",
+            non_negative=True,
+        )
+
+    if pretrained:
+        checkpoint = (
+            "https://github.com/isl-org/MiDaS/releases/download/v3_1/dpt_beit_large_512.pt"
+        )
+        state_dict = torch.hub.load_state_dict_from_url(
+            checkpoint, map_location=torch.device('cpu'), progress=True, check_hash=True
+        )
+        model.load_state_dict(state_dict)
+
+    return model
 
 def get_depth_estimate(filepath, transform, midas, device, color):
     # Transform input for midas
@@ -100,7 +124,7 @@ if __name__ == "__main__":
         "--color",
         type=bool,
         default=False,
-        choices=[True, False],
+        # choices=[True, False],
         help="Whether to output color images. (Default: False)",
     )
 
@@ -123,12 +147,11 @@ if __name__ == "__main__":
         device = torch.device("cpu")
         print("No GPU found, using CPU instead")
 
-    # Download the MiDaS model
-    model_type = "DPT_BEiT_L_512"  # MiDaS v3.1 - Large     (highest accuracy, slowest inference speed)
-    midas = torch.hub.load("intel-isl/MiDaS", model_type)
+    # Load model
+    midas = DPT_BEiT_L_512()
     midas.to(device)
     midas.eval()
-
+    
     # Define transforms for model
     midas_transforms = torch.hub.load("intel-isl/MiDaS", "transforms")
     transform = (
