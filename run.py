@@ -8,6 +8,12 @@ import argparse
 
 from models.dpt_depth import DPTDepthModel
 
+'''
+Example Usage:
+python run.py -i "./data" -o "./data_out"
+
+'''
+
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
