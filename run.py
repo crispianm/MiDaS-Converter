@@ -166,3 +166,6 @@ if __name__ == "__main__":
     # transform = midas_transforms.dpt_transform
 
     process_folder(args.input, args.output, transform, midas, args.device, args.color)
+
+
+# python run.py -i "./data" -o "./data_out"

@@ -1,49 +1,31 @@
 # Import dependencies
-import cv2
+from PIL import Image
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 
+from zoedepth.models.builder import build_model
+from zoedepth.utils.config import get_config
+
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 
-def get_depth_estimate(filepath, transform, zoe, device, color=True):
-    # Transform input for zoe
-    img = cv2.imread(filepath)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+def get_depth_estimate(filepath, zoe, device, color=True):
 
-    input_batch = transform(img).to(device)
+    img = Image.open(filepath).convert("RGB")
 
-    # Make a prediction
+    # Make a depth prediction
     with torch.no_grad():
-        prediction = zoe(input_batch)
-        prediction = torch.nn.functional.interpolate(
-            prediction.unsqueeze(1),
-            size=img.shape[:2],
-            mode="bicubic",
-            align_corners=False,
-        ).squeeze()
-
+        prediction = zoe.infer_pil(img, output_type="tensor")
         output = prediction.cpu().numpy()
-
     return output
 
 
-# def split_video(video_filepath):
-#     vidcap = cv2.VideoCapture(video_filepath)
-#     count = 0
-#     success = True
-#     while success:
-#         success,image = vidcap.read()
-#         print('Read a new frame: ', success)
-#         cv2.imwrite("frame%d.jpg" % count, image)     # save frame as JPEG file
-#         count += 1
-
 
 def process_folder(
-    input_folder_path, output_folder_path, transform, zoe, device, color=True
+    input_folder_path, output_folder_path, zoe, device, color=True
 ):
     if not os.path.exists(output_folder_path):
         os.makedirs(output_folder_path)
@@ -58,7 +40,7 @@ def process_folder(
                 print(f"{output_file_path} already exists, skipping.")
             else:
                 depth_estimate = get_depth_estimate(
-                    input_file_path, transform, zoe, device, color=color
+                    input_file_path, zoe, device, color=color
                 )
                 print(f"Saving image {output_file_path}.")
                 if color == True:
@@ -73,32 +55,26 @@ def process_folder(
             # Recursively process subfolder
             subfolder_output_path = os.path.join(output_folder_path, item.name)
             process_folder(
-                item.path, subfolder_output_path, transform, zoe, device, color=color
+                item.path, subfolder_output_path, zoe, device, color=color
             )
 
 
 if __name__ == "__main__":
-    # todo: add command line arguments for model type and input/output folders
 
-    model_type = "DPT_BEiT_L_512"
-
-    # Download the zoe model
     if torch.cuda.is_available():
         device = torch.device("cuda")
         print("Using ", torch.cuda.get_device_name(0))
     else:
         device = torch.device("cpu")
         print("No GPU found, using CPU instead")
-    zoe = torch.hub.load("isl-org/ZoeDepth", "ZoeD_NK", pretrained=True)
+    # zoe = torch.hub.load("isl-org/ZoeDepth", "ZoeD_NK", pretrained=True)
+        
+    # ZoeD_NK
+
+    conf = get_config("zoedepth_nk", "infer")
+    zoe = build_model(conf)
     zoe.to(device)
     zoe.eval()
-
-    # Input transformation pipeline
-    zoe_transforms = torch.hub.load("intel-isl/zoe", "transforms")
-
-    # BEiT Transform appears better, but you could use DPT instead
-    # transform = zoe_transforms.dpt_transform
-    transform = zoe_transforms.beit512_transform
 
     # Set to False if you want grayscale output
     color = False
@@ -110,10 +86,10 @@ if __name__ == "__main__":
         input_folder = sys.argv[1]
         output_folder = sys.argv[2]
         process_folder(
-            input_folder, output_folder, transform, zoe, device, color=color
+            input_folder, output_folder, zoe, device, color=color
         )
 
 
-# python run.py "./data" "./data_out"
+# python run_zoe.py "./data" "./data_out"
 "C:/Users/crisp/Desktop/layered-neural-atlases/data/puck"
 "C:/Users/crisp/Desktop/layered-neural-atlases/data/puck_depth"

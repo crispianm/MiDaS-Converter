@@ -7,8 +7,8 @@ import os
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
-model_type = "MiDaS_small"
-model_type = "DPT_LeViT_224"
+model_type = "DPT_BEiT_L_512"
+# model_type = "DPT_LeViT_224"
 
 # Import MiDaS
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
